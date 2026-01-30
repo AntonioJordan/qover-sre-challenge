@@ -1,3 +1,17 @@
+# Node / App
+node_modules
+dist
+*.log
+.env
+.env.*
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.vscode
+.idea
+
+# Terraform
 .terraform/
 *.tfstate
 *.tfstate.backup
