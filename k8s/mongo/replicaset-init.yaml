@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongo-rs-init
+  namespace: qover
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mongo-init
+          image: mongo:8.0
+          env:
+            - name: MONGO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-auth
+                  key: MONGO_INITDB_ROOT_USERNAME
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-auth
+                  key: MONGO_INITDB_ROOT_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Mongo..."
+              until mongosh --host mongo-0.mongo-headless.qover.svc.cluster.local \
+                -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin \
+                --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
+                sleep 5
+              done
+
+              echo "Initiating ReplicaSet..."
+              mongosh --host mongo-0.mongo-headless.qover.svc.cluster.local \
+                -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin --eval "
+                rs.initiate({
+                  _id: 'rs0',
+                  members: [
+                    { _id: 0, host: 'mongo-0.mongo-headless.qover.svc.cluster.local:27017' }
+                  ]
+                })
+              "
+
+              echo "Waiting for PRIMARY..."
+              until mongosh --host mongo-0.mongo-headless.qover.svc.cluster.local \
+                -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin \
+                --eval "rs.isMaster().ismaster" | grep true; do
+                sleep 3
+              done
