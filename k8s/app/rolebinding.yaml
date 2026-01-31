@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: qover-app-rb
+  namespace: qover
+subjects:
+  - kind: ServiceAccount
+    name: qover-app-sa
+    namespace: qover
+roleRef:
+  kind: Role
+  name: qover-app-role
+  apiGroup: rbac.authorization.k8s.io

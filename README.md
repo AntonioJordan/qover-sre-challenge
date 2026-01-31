@@ -53,3 +53,45 @@ curl http://localhost:3001/health
 curl http://localhost:3001/data
 curl http://localhost:3001/metrics
 
+#-----Task 3----#
+
+In Task 3 was to deploy the application using GitOps with ArgoCD and expose it through an NGINX Ingress, adding security and network isolation.
+
+Kubernetes manifests were created for the application (Namespace, Deployment, Service, Ingress, RBAC and NetworkPolicies). An ArgoCD Application resource points to k8s/app in the repository so the cluster state is reconciled automatically from GitHub.
+
+The application is exposed using an NGINX Ingress with a reproducible DNS name based on nip.io:
+
+http://qover.127.0.0.1.nip.io
+
+Security and isolation:
+
+Dedicated ServiceAccount with minimal RBAC permissions (read-only access to the MongoDB Secret).
+
+NetworkPolicies:
+
+MongoDB only accepts traffic from the application.
+
+The application can only reach MongoDB and DNS (egress restricted).
+
+Health and resiliency:
+
+readinessProbe and livenessProbe on /health.
+
+MongoDB runs as a StatefulSet with persistent storage and was validated by deleting the pod and observing automatic recreation.
+
+Commands used:
+
+kubectl apply -f k8s/argocd/namespace.yaml
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+kubectl apply -f k8s/argocd/application.yaml
+kubectl apply -f k8s/app/
+kubectl apply -f k8s/mongo/networkpolicy.yaml
+
+Verification:
+
+curl http://qover.127.0.0.1.nip.io/health
+curl http://qover.127.0.0.1.nip.io/data
+curl http://qover.127.0.0.1.nip.io/metrics
+
+This completes the GitOps-based deployment with ingress, isolation and observability.
