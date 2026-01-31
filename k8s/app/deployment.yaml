@@ -28,14 +28,13 @@ spec:
             - name: MONGO_URI
               valueFrom:
                 secretKeyRef:
-                  name: mongo-uri
+                  name: mongo-auth
                   key: MONGO_URI
           envFrom:
             - configMapRef:
                 name: qover-app-config
           ports:
             - containerPort: 3000
-
           resources:
             requests:
               cpu: "50m"
@@ -43,14 +42,12 @@ spec:
             limits:
               cpu: "200m"
               memory: "128Mi"
-
           readinessProbe:
             httpGet:
               path: /health
               port: 3000
             initialDelaySeconds: 5
             periodSeconds: 5
-
           livenessProbe:
             httpGet:
               path: /health
