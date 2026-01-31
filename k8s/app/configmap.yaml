@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qover-app-config
+  namespace: qover
+data:
+  PORT: "3000"
