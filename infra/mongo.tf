@@ -4,21 +4,6 @@ resource "kubernetes_namespace" "qover" {
   }
 }
 
-resource "kubernetes_secret" "mongo_auth" {
-  metadata {
-    name      = "mongo-auth"
-    namespace = kubernetes_namespace.qover.metadata[0].name
-  }
-
-  data = {
-    MONGO_INITDB_ROOT_USERNAME = var.mongo_user
-    MONGO_INITDB_ROOT_PASSWORD = var.mongo_password
-    MONGO_URI                  = local.mongo_uri
-  }
-
-  type = "Opaque"
-}
-
 resource "kubernetes_secret" "mongo_keyfile" {
   metadata {
     name      = "mongo-keyfile"
@@ -54,7 +39,7 @@ resource "kubernetes_service" "mongo_headless" {
 
 resource "kubernetes_stateful_set" "mongo" {
   depends_on = [
-    kubernetes_secret.mongo_auth,
+    kubernetes_secret_v1.mongo_auth,
     kubernetes_secret.mongo_keyfile
   ]
 
@@ -130,7 +115,7 @@ resource "kubernetes_stateful_set" "mongo" {
 
           env_from {
             secret_ref {
-              name = kubernetes_secret.mongo_auth.metadata[0].name
+              name = kubernetes_secret_v1.mongo_auth.metadata[0].name
             }
           }
 

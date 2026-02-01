@@ -3,9 +3,11 @@ variable "is_dr_active" {
 }
 
 variable "mongo_user" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "mongo_password" {
-  type = string
+  type      = string
+  sensitive = true
 }
