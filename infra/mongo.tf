@@ -95,8 +95,8 @@ resource "kubernetes_stateful_set" "mongo" {
         }
 
         init_container {
-          name  = "fix-keyfile-perms"
-          image = "busybox:1.36"
+          name    = "fix-keyfile-perms"
+          image   = "busybox:1.36"
           command = ["sh", "-c"]
           args    = ["cp /in/keyfile /out/keyfile && chmod 0400 /out/keyfile && chown 999:999 /out/keyfile"]
 
