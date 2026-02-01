@@ -1,14 +1,11 @@
 variable "is_dr_active" {
-  type    = bool
-  default = false
+  type = bool
 }
 
 variable "mongo_user" {
-  type    = string
-  default = "appuser"
+  type = string
 }
 
 variable "mongo_password" {
-  type    = string
-  default = "123"
+  type = string
 }
