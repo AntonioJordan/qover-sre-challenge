@@ -22,31 +22,90 @@ spec:
                 secretKeyRef:
                   name: mongo-auth
                   key: MONGO_INITDB_ROOT_PASSWORD
+            - name: IS_DR_ACTIVE
+              valueFrom:
+                configMapKeyRef:
+                  name: mongo-config
+                  key: is_dr_active
           command:
             - sh
             - -c
             - |
-              echo "Waiting for Mongo..."
-              until mongosh --host mongo-0.mongo-headless.qover.svc.cluster.local \
-                -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin \
+              set -e
+
+              RS_NAME="rs0"
+              HOST0="mongo-0.mongo-headless.qover.svc.cluster.local:27017"
+              HOST1="mongo-1.mongo-headless.qover.svc.cluster.local:27017"
+              HOST2="mongo-2.mongo-headless.qover.svc.cluster.local:27017"
+
+              echo "Waiting for mongo-0..."
+              until mongosh --host $HOST0 -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin \
                 --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
                 sleep 5
               done
 
-              echo "Initiating ReplicaSet..."
-              mongosh --host mongo-0.mongo-headless.qover.svc.cluster.local \
-                -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin --eval "
-                rs.initiate({
-                  _id: 'rs0',
-                  members: [
-                    { _id: 0, host: 'mongo-0.mongo-headless.qover.svc.cluster.local:27017' }
-                  ]
-                })
-              "
+              MEMBERS=$(mongosh --host $HOST0 -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin \
+                --quiet --eval "try { rs.conf().members.length } catch(e) { 0 }")
 
-              echo "Waiting for PRIMARY..."
-              until mongosh --host mongo-0.mongo-headless.qover.svc.cluster.local \
-                -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin \
-                --eval "rs.isMaster().ismaster" | grep true; do
-                sleep 3
-              done
+              echo "Current members: $MEMBERS"
+
+              if [ "$IS_DR_ACTIVE" = "true" ]; then
+                echo "DR enabled"
+
+                echo "Waiting for mongo-1 and mongo-2..."
+                for h in $HOST1 $HOST2; do
+                  until mongosh --host $h -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin \
+                    --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
+                    sleep 5
+                  done
+                done
+
+                if [ "$MEMBERS" -eq 0 ]; then
+                  echo "Initializing ReplicaSet with 3 members..."
+                  mongosh --host $HOST0 -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin --eval "
+                    rs.initiate({
+                      _id: \"$RS_NAME\",
+                      members: [
+                        { _id: 0, host: \"$HOST0\" },
+                        { _id: 1, host: \"$HOST1\" },
+                        { _id: 2, host: \"$HOST2\" }
+                      ]
+                    })
+                  "
+                elif [ "$MEMBERS" -eq 1 ]; then
+                  echo "Reconfiguring ReplicaSet to 3 members..."
+                  mongosh --host $HOST0 -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin --eval "
+                    rs.reconfig({
+                      _id: \"$RS_NAME\",
+                      members: [
+                        { _id: 0, host: \"$HOST0\" },
+                        { _id: 1, host: \"$HOST1\" },
+                        { _id: 2, host: \"$HOST2\" }
+                      ]
+                    }, { force: true })
+                  "
+                else
+                  echo "ReplicaSet already has 3 members"
+                fi
+
+              else
+                echo "DR disabled"
+
+                if [ "$MEMBERS" -eq 0 ]; then
+                  echo "Initializing ReplicaSet with 1 member..."
+                  mongosh --host $HOST0 -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin --eval "
+                    rs.initiate({
+                      _id: \"$RS_NAME\",
+                      members: [
+                        { _id: 0, host: \"$HOST0\" }
+                      ]
+                    })
+                  "
+                else
+                  echo "Single-node ReplicaSet already initialized"
+                fi
+              fi
+
+              echo "Final ReplicaSet status:"
+              mongosh --host $HOST0 -u "$MONGO_USER" -p "$MONGO_PASSWORD" --authenticationDatabase admin \
+                --eval "rs.status()"

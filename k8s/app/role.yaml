@@ -6,5 +6,5 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
-    resourceNames: ["mongo-uri"]
+    resourceNames: ["mongo-auth"]
     verbs: ["get"]
