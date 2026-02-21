@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traffic-simulator
+  namespace: simulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traffic-simulator
+  template:
+    metadata:
+      labels:
+        app: traffic-simulator
+    spec:
+      containers:
+        - name: simulator
+          image: curlimages/curl:8.6.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              set -eu
+              BASE="http://qover-app.qover.svc.cluster.local"
+              i=0
+              while true; do
+                i=$((i+1))
+                echo "{\"ts\":\"$(date -Iseconds)\",\"level\":\"info\",\"msg\":\"tick\",\"i\":$i}"
+                curl -sS -o /dev/null -w "ok / => %{http_code}\n" "$BASE/" || true
+                curl -sS -o /dev/null -w "ok /data => %{http_code}\n" "$BASE/data" || true
+                curl -sS -o /dev/null -w "err /health => %{http_code}\n" "$BASE/health" || true
+                curl -sS -o /dev/null -w "err /does-not-exist => %{http_code}\n" "$BASE/does-not-exist" || true
+                if [ $((i % 7)) -eq 0 ]; then
+                  echo "{\"ts\":\"$(date -Iseconds)\",\"level\":\"warn\",\"msg\":\"simulated-warning\",\"i\":$i}"
+                fi
+                if [ $((i % 13)) -eq 0 ]; then
+                  echo "{\"ts\":\"$(date -Iseconds)\",\"level\":\"error\",\"msg\":\"simulated-error\",\"i\":$i}"
+                fi
+                sleep 1
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi

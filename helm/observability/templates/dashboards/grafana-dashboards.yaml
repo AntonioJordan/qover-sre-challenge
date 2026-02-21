@@ -1,0 +1,128 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qover-grafana-dashboards
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  qover-app-overview.json: |
+    {
+      "id": null,
+      "uid": "qover-app-overview",
+      "title": "Qover App Overview",
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "10s",
+      "tags": [
+        "qover",
+        "training"
+      ],
+      "time": {
+        "from": "now-15m",
+        "to": "now"
+      },
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "HTTP Requests / sec",
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total[1m]))",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "HTTP p95 latency (s)",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Mongo ping duration p95 (s)",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(mongo_query_duration_seconds_bucket[5m])))",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 8
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Pod CPU (cores)",
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"qover\",pod=~\"qover-app-.*\",container!=\"\"}[5m]))",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 8
+          }
+        }
+      ]
+    }
+  qover-logs.json: |
+    {
+      "id": null,
+      "uid": "qover-logs",
+      "title": "Qover Logs",
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "10s",
+      "tags": [
+        "qover",
+        "logs"
+      ],
+      "time": {
+        "from": "now-15m",
+        "to": "now"
+      },
+      "panels": [
+        {
+          "type": "logs",
+          "title": "Application logs (qover namespace)",
+          "targets": [
+            {
+              "expr": "{namespace=\"qover\"}",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          }
+        }
+      ]
+    }

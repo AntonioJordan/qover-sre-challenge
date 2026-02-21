@@ -1,0 +1,46 @@
+kube-prometheus-stack:
+  grafana:
+    adminUser: admin
+    adminPassword: admin
+    defaultDashboardsEnabled: false
+    persistence:
+      enabled: false
+    grafana.ini:
+      server:
+        root_url: http://localhost:3000
+      users:
+        auto_assign_org_role: Viewer
+    sidecar:
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+        searchNamespace: ALL
+    additionalDataSources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://observability-loki:3100
+        isDefault: false
+      - name: Tempo
+        type: tempo
+        access: proxy
+        url: http://observability-tempo:3100
+        isDefault: false
+
+  prometheus:
+    prometheusSpec:
+      serviceMonitorSelectorNilUsesHelmValues: false
+
+loki:
+  enabled: true
+  persistence:
+    enabled: false
+
+tempo:
+  enabled: true
+  tempo:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+          http:

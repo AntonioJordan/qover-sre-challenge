@@ -3,11 +3,14 @@ kind: Service
 metadata:
   name: qover-app
   namespace: qover
+  labels:
+    app: qover-app
 spec:
   selector:
     app: qover-app
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 80
       targetPort: 3000
   type: ClusterIP

@@ -1,6 +1,11 @@
 import express from "express";
 import { MongoClient, Db } from "mongodb";
-import { collectDefaultMetrics, Histogram, Registry } from "prom-client";
+import {
+  collectDefaultMetrics,
+  Counter,
+  Histogram,
+  Registry,
+} from "prom-client";
 
 const app = express();
 const port = Number(process.env.PORT ?? "3000");
@@ -17,16 +22,84 @@ let db: Db;
 const register = new Registry();
 collectDefaultMetrics({ register });
 
+const httpRequestsTotal = new Counter({
+  name: "http_requests_total",
+  help: "Total number of HTTP requests",
+  labelNames: ["method", "route", "status_code"] as const,
+  registers: [register],
+});
+
+const httpRequestDuration = new Histogram({
+  name: "http_request_duration_seconds",
+  help: "HTTP request duration in seconds",
+  labelNames: ["method", "route", "status_code"] as const,
+  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+  registers: [register],
+});
+
 const mongoQueryDuration = new Histogram({
   name: "mongo_query_duration_seconds",
   help: "Duration of MongoDB ping query",
   registers: [register],
 });
 
+function getRouteLabel(req: express.Request): string {
+  const routePath = req.route?.path;
+  if (typeof routePath === "string") return routePath;
+  return "unknown";
+}
+
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+
+  res.on("finish", () => {
+    const route = getRouteLabel(req);
+    const statusCode = String(res.statusCode);
+    const durationSeconds =
+      Number(process.hrtime.bigint() - start) / 1_000_000_000;
+
+    httpRequestsTotal.inc({
+      method: req.method,
+      route,
+      status_code: statusCode,
+    });
+
+    httpRequestDuration.observe(
+      {
+        method: req.method,
+        route,
+        status_code: statusCode,
+      },
+      durationSeconds
+    );
+
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        level: "info",
+        msg: "request",
+        method: req.method,
+        path: req.path,
+        route,
+        statusCode: res.statusCode,
+        durationSeconds,
+      })
+    );
+  });
+
+  next();
+});
+
 async function connectMongo() {
   await client.connect();
   db = client.db("test");
-  console.log("Connected to MongoDB");
+  console.log(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      level: "info",
+      msg: "Connected to MongoDB",
+    })
+  );
 }
 
 app.get("/", (_req, res) => {
@@ -58,7 +131,13 @@ app.get("/metrics", async (_req, res) => {
 });
 
 async function shutdown() {
-  console.log("Shutting down...");
+  console.log(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      level: "info",
+      msg: "Shutting down",
+    })
+  );
   await client.close();
   process.exit(0);
 }
@@ -69,10 +148,24 @@ process.on("SIGINT", shutdown);
 connectMongo()
   .then(() => {
     app.listen(port, () => {
-      console.log(`App listening on port ${port}`);
+      console.log(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          level: "info",
+          msg: "App listening",
+          port,
+        })
+      );
     });
   })
   .catch((err) => {
-    console.error("Mongo connection failed", err);
+    console.error(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        level: "error",
+        msg: "Mongo connection failed",
+        err: String(err),
+      })
+    );
     process.exit(1);
   });
